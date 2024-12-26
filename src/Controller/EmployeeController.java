@@ -125,35 +125,31 @@ public class EmployeeController {
 
     private void deleteEmployee() {
         try {
-            // Demander l'ID de l'employé à supprimer
-            String idInput = JOptionPane.showInputDialog(view, 
-                    "Entrez l'ID de l'employé à supprimer :", 
-                    "Suppression d'un employé", 
-                    JOptionPane.QUESTION_MESSAGE);
-    
-            if (idInput == null || idInput.trim().isEmpty()) {
-                JOptionPane.showMessageDialog(view, "Aucun ID saisi. Suppression annulée.");
+            // Vérifier si une ligne est sélectionnée dans la table
+            int selectedRow = view.employeeTable.getSelectedRow();
+            if (selectedRow == -1) {
+                JOptionPane.showMessageDialog(view, "Veuillez sélectionner un employé à supprimer.");
                 return;
             }
-    
-            int id = Integer.parseInt(idInput.trim());
-    
+
+            // Récupérer l'ID de l'employé à partir du modèle de table
+            int id = (int) view.employeeTable.getValueAt(selectedRow, 0); // Supposons que la colonne 0 contient l'ID
+
             // Demander confirmation avant de supprimer
             int confirm = JOptionPane.showConfirmDialog(view, 
                     "Êtes-vous sûr de vouloir supprimer l'employé avec l'ID " + id + " ?", 
                     "Confirmation de suppression", 
                     JOptionPane.YES_NO_OPTION);
-    
+
             if (confirm == JOptionPane.YES_OPTION) {
-                // Supprimer l'employé
+                // Supprimer l'employé via le DAO
                 dao.delete(id);
+
                 JOptionPane.showMessageDialog(view, "Employé supprimé avec succès.");
-                listEmployees(); // Rafraîchir la liste
+                listEmployees(); // Rafraîchir la liste des employés
             } else {
                 JOptionPane.showMessageDialog(view, "Suppression annulée.");
             }
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(view, "ID invalide. Veuillez entrer un nombre valide.");
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(view, "Erreur : " + ex.getMessage());
         }

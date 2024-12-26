@@ -94,7 +94,6 @@ public class HolidayController {
 
         return end.isAfter(start);
     }
-
     private void addHoliday() {
         try {
             String employeeName = (String) view.employeeNameComboBox.getSelectedItem();
@@ -110,9 +109,34 @@ public class HolidayController {
                 throw new IllegalArgumentException("La date de fin doit être supérieure à la date de début.");
             }
 
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
+            LocalDate start = LocalDate.parse(startDate, formatter);
+            LocalDate end = LocalDate.parse(endDate, formatter);
+
+            // Calcul de la durée en jours
+            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1; // +1 pour inclure le jour de début
+            
+            if (daysBetween > 25) {
+                throw new IllegalArgumentException("La durée du congé ne peut pas dépasser 25 jours.");
+            }
+            if (dao.hasOverlappingHoliday(employeeName, startDate, endDate)) {
+                throw new IllegalArgumentException("L'employé a déjà un congé durant cette période.");
+            }
+
+            // Vérifier le total des jours de congé pris cette année
+            int year = start.getYear();
+            long existingDays = dao.getTotalDaysTakenThisYear(employeeName, year);
+            if (existingDays + daysBetween > 25) {
+                throw new IllegalArgumentException(
+                    "L'employé a déjà pris " + existingDays + " jours de congé cette année. " +
+                    "Le total ne peut pas dépasser 25 jours."
+                );
+            }
+            
+            // Ajout du congé si toutes les validations sont passées
             Holiday holiday = new Holiday(employeeName, startDate, endDate, type);
             dao.add(holiday);
-            loadEmployeeNames(); 
+            loadEmployeeNames();
             refreshHolidayTable();
             JOptionPane.showMessageDialog(view, "Congé ajouté avec succès.");
         } catch (Exception ex) {
@@ -139,6 +163,10 @@ public class HolidayController {
                 if (!isEndDateAfterStartDate(startDate, endDate)) {
                     throw new IllegalArgumentException("La date de fin doit être supérieure à la date de début.");
                 }
+                if (dao.hasOverlappingHoliday(employeeName, startDate, endDate)) {
+                    throw new IllegalArgumentException("L'employé a déjà un congé durant cette période.");
+                }
+
 
                 Holiday holiday = new Holiday(employeeName, startDate, endDate, type);
                 dao.update(holiday, id);
@@ -155,30 +183,34 @@ public class HolidayController {
 
     private void deleteHoliday() {
         try {
-            // Afficher un message pour entrer un ID de congé
-            String input = JOptionPane.showInputDialog(view, "Veuillez entrer l'ID du congé à supprimer:");
-            if (input != null && !input.trim().isEmpty()) {
-                int id = Integer.parseInt(input.trim());
-    
-                // Demander confirmation avant de supprimer
-                int confirm = JOptionPane.showConfirmDialog(view, 
-                        "Êtes-vous sûr de vouloir supprimer le congé avec l'ID " + id + " ?", 
-                        "Confirmation de suppression", 
-                        JOptionPane.YES_NO_OPTION);
-    
-                if (confirm == JOptionPane.YES_OPTION) {
-                    dao.delete(id); // Supprimer le congé
-                    loadEmployeeNames();
-                    refreshHolidayTable();
-                    JOptionPane.showMessageDialog(view, "Congé supprimé avec succès.");
-                } else {
-                    JOptionPane.showMessageDialog(view, "Suppression annulée.");
-                }
-            } else {
-                JOptionPane.showMessageDialog(view, "ID de congé non valide ou action annulée.");
+            // Vérifier si une ligne est sélectionnée dans la table
+            int selectedRow = view.holidayTable.getSelectedRow();
+            if (selectedRow == -1) {
+                JOptionPane.showMessageDialog(view, "Veuillez sélectionner un congé à supprimer.");
+                return;
             }
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(view, "ID invalide. Veuillez entrer un nombre valide.");
+
+            // Récupérer l'ID du congé à partir du modèle de table
+            int id = (int) view.holidayTable.getValueAt(selectedRow, 0); // Supposons que la colonne 0 contient l'ID
+
+            // Demander confirmation avant de supprimer
+            int confirm = JOptionPane.showConfirmDialog(view, 
+                    "Êtes-vous sûr de vouloir supprimer le congé avec l'ID " + id + " ?", 
+                    "Confirmation de suppression", 
+                    JOptionPane.YES_NO_OPTION);
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                // Supprimer le congé via le DAO
+                dao.delete(id);
+
+                // Rafraîchir les données dans la vue
+                loadEmployeeNames();
+                refreshHolidayTable();
+
+                JOptionPane.showMessageDialog(view, "Congé supprimé avec succès.");
+            } else {
+                JOptionPane.showMessageDialog(view, "Suppression annulée.");
+            }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(view, "Erreur : " + ex.getMessage());
         }
